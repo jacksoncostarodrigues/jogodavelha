@@ -678,34 +678,6 @@ function selectCell(controller) {
   });
 }
 
-
-    raycaster.ray.direction
-      .set(0, 0, -1)
-      .applyMatrix4(tempMatrix);
-
-    const hits = raycaster.intersectObjects(cellObjects, false);
-
-    if (!hits.length) return;
-
-    const index = hits[0].object.userData.cellIndex;
-    const cells = getHTMLCells();
-
-    if (index == null || !cells[index]) return;
-
-    // Não permite selecionar uma casa já ocupada.
-    if (readMark(cells[index])) {
-      setStatus("Essa casa já está ocupada. Escolha outra.");
-      return;
-    }
-
-    // Usa a lógica de jogada que já existe no jogo original.
-    cells[index].click();
-
-    // Atualiza o tabuleiro 3D depois da jogada.
-    requestAnimationFrame(synchronizeBoard);
-    setStatus("Jogada enviada ao jogo.");
-  }
-
   // --------------------------------------------------
   // Sessão WebXR
   // --------------------------------------------------
