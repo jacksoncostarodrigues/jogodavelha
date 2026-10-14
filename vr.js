@@ -1,4 +1,3 @@
-
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
 (() => {
@@ -23,6 +22,12 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
   const cellObjects = [];
   const cellMaterials = [];
   const markObjects = new Array(9).fill(null);
+
+  let painelResultado = null;
+  let textoResultado = null;
+  let botaoJogarNovamente = null;
+  let textoBotaoNovamente = null;
+  let partidaFinalizadaVR = false;
 
   let observer = null;
   let lastBoardState = "";
@@ -370,6 +375,129 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
     return "";
   }
 
+  
+function detectarResultadoVR() {
+  const cells = getHTMLCells();
+
+  if (cells.length !== 9) return null;
+
+  const board = cells.map(readMark);
+
+  const combinacoes = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  for (const [a, b, c] of combinacoes) {
+    if (
+      board[a] &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+      return {
+        tipo: "vitoria",
+        simbolo: board[a],
+        mensagem: `VITÓRIA DO JOGADOR ${board[a]}!`
+      };
+    }
+  }
+
+  if (board.every(Boolean)) {
+    return {
+      tipo: "empate",
+      simbolo: "",
+      mensagem: "EMPATE! NINGUÉM VENCEU."
+    };
+  }
+
+  return null;
+}
+
+
+function criarPainelResultadoVR(mensagem) {
+  if (!boardGroup) return;
+
+  if (painelResultado) {
+    boardGroup.remove(painelResultado);
+    disposeObject(painelResultado);
+  }
+
+  painelResultado = new THREE.Group();
+  painelResultado.position.set(0, 0, 0.35);
+
+  const fundo = new THREE.Mesh(
+    new THREE.BoxGeometry(1.85, 0.85, 0.08),
+    new THREE.MeshStandardMaterial({
+      color: 0x10182e,
+      emissive: 0x163c75,
+      emissiveIntensity: 1,
+      metalness: 0.2,
+      roughness: 0.3
+    })
+  );
+
+  painelResultado.add(fundo);
+
+  textoResultado = makeText(mensagem, 0.11, "#ffffff");
+  textoResultado.position.set(0, 0.16, 0.06);
+  painelResultado.add(textoResultado);
+
+  const materialBotao = new THREE.MeshStandardMaterial({
+    color: 0x176bdb,
+    emissive: 0x124cff,
+    emissiveIntensity: 1
+  });
+
+  botaoJogarNovamente = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.23, 0.06),
+    materialBotao
+  );
+
+  botaoJogarNovamente.position.set(0, -0.19, 0.08);
+  botaoJogarNovamente.userData.acaoVR = "reiniciar";
+  painelResultado.add(botaoJogarNovamente);
+
+  textoBotaoNovamente = makeText(
+    "JOGAR NOVAMENTE",
+    0.07,
+    "#ffffff"
+  );
+
+  textoBotaoNovamente.position.set(0, -0.19, 0.12);
+  painelResultado.add(textoBotaoNovamente);
+
+  boardGroup.add(painelResultado);
+}
+
+function removerPainelResultadoVR() {
+  if (!painelResultado || !boardGroup) return;
+
+  boardGroup.remove(painelResultado);
+  disposeObject(painelResultado);
+
+  painelResultado = null;
+  textoResultado = null;
+  botaoJogarNovamente = null;
+  textoBotaoNovamente = null;
+
+  partidaFinalizadaVR = false;
+}
+
+function atualizarResultadoVR() {
+  const resultado = detectarResultadoVR();
+
+  if (resultado && !partidaFinalizadaVR) {
+    partidaFinalizadaVR = true;
+    criarPainelResultadoVR(resultado.mensagem);
+  }
+
+  if (!resultado && partidaFinalizadaVR) {
+    removerPainelResultadoVR();
+  }
+}
+
+
   function synchronizeBoard() {
     if (!boardGroup) return;
 
@@ -490,12 +618,66 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
     });
   }
 
-  function selectCell(controller) {
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
+  
+function selectCell(controller) {
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
 
-    raycaster.ray.origin.setFromMatrixPosition(
-      controller.matrixWorld
+  raycaster.ray.origin.setFromMatrixPosition(
+    controller.matrixWorld
+  );
+
+  raycaster.ray.direction
+    .set(0, 0, -1)
+    .applyMatrix4(tempMatrix);
+
+  // Se a partida terminou, só aceita o botão de reiniciar.
+  if (partidaFinalizadaVR && botaoJogarNovamente) {
+    const hitsBotao = raycaster.intersectObject(
+      botaoJogarNovamente,
+      false
     );
+
+    if (hitsBotao.length) {
+      const botaoHTML = document.getElementById("botaoReiniciar");
+
+      if (botaoHTML) {
+        botaoHTML.click();
+        removerPainelResultadoVR();
+
+        lastBoardState = "";
+        requestAnimationFrame(synchronizeBoard);
+
+        setStatus("Nova partida iniciada.");
+      } else {
+        setStatus(
+          "Não encontrei o botão botaoReiniciar no HTML."
+        );
+      }
+
+      return;
+    }
+
+    return;
+  }
+
+  const hits = raycaster.intersectObjects(cellObjects, false);
+
+  if (!hits.length) return;
+
+  const index = hits[0].object.userData.cellIndex;
+  const cells = getHTMLCells();
+
+  if (index == null || !cells[index]) return;
+  if (readMark(cells[index])) return;
+
+  cells[index].click();
+
+  requestAnimationFrame(() => {
+    synchronizeBoard();
+    atualizarResultadoVR();
+  });
+}
+
 
     raycaster.ray.direction
       .set(0, 0, -1)
@@ -578,10 +760,13 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.m
 
       renderer.setAnimationLoop(() => {
         synchronizeBoard();
+        atualizarResultadoVR();
+
         updateHover(controller1);
         updateHover(controller2);
-        renderer.render(scene, camera);
-      });
+
+  renderer.render(scene, camera);
+});
 
       session.addEventListener("end", () => {
         renderer.setAnimationLoop(null);
