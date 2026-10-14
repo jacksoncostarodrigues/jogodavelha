@@ -1,0 +1,222 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Jogo da Velha</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background: #1e1e2e;
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+            justify-content: center;
+        }
+        h1 { margin-bottom: 15px; font-size: 42px; }
+        .tela {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .escondido { display: none; }
+
+        p { font-size: 22px; }
+
+        .botaoGrande {
+            padding: 28px 50px;
+            font-size: 28px;
+            margin: 14px;
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            background: #45475a;
+            color: white;
+            min-width: 340px;
+        }
+        .botaoGrande:hover {
+            background: #89b4fa;
+            color: #1e1e2e;
+        }
+
+        input[type="text"] {
+            padding: 16px;
+            border-radius: 10px;
+            border: none;
+            font-size: 22px;
+            margin: 10px;
+            min-width: 280px;
+        }
+        #botaoComecar {
+            padding: 20px 40px;
+            font-size: 24px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            background: #89b4fa;
+            margin-top: 18px;
+        }
+
+        #placar {
+            display: flex;
+            gap: 40px;
+            margin-top: 20px;
+            font-size: 22px;
+        }
+        .placar-item { text-align: center; }
+        .placar-valor {
+            font-size: 36px;
+            font-weight: bold;
+            color: #89b4fa;
+        }
+
+        #tabuleiroWrapper {
+            position: relative;
+            margin-top: 25px;
+        }
+
+        #tabuleiro {
+            display: grid;
+            grid-template-columns: repeat(3, 140px);
+            grid-template-rows: repeat(3, 140px);
+            gap: 8px;
+        }
+        .celula {
+            background: #313244;
+            font-size: 72px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+        .celula:hover { background: #45475a; }
+        .celula.x { color: #f38ba8; }
+        .celula.o { color: #a6e3a1; }
+
+        @keyframes popIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .celula.x, .celula.o {
+            animation: popIn 0.25s ease-out;
+        }
+
+        @keyframes pulsar {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .celula.vencedora {
+            animation: pulsar 0.7s ease-in-out infinite;
+            background: #585b70;
+        }
+
+        #overlayVitoria {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    overflow: hidden;
+    pointer-events: none;
+}
+#overlayVitoria:not(.escondido) {
+    display: flex;
+}
+        #canvasConfete {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #textoVitoria {
+            position: relative;
+            z-index: 2;
+            font-size: 44px;
+            font-weight: 900;
+            text-align: center;
+            padding: 10px 20px;
+            color: #ffd43b;
+            text-shadow:
+                3px 3px 0 #000,
+                -3px -3px 0 #000,
+                3px -3px 0 #000,
+                -3px 3px 0 #000;
+            animation: popIn 0.4s ease-out, pulsar 1s ease-in-out infinite;
+        }
+
+        #mensagem { margin-top: 25px; font-size: 26px; }
+
+        .botaoAcao {
+            margin-top: 20px;
+            padding: 16px 28px;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 10px;
+            border: none;
+            background: #89b4fa;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Jogo da Velha</h1>
+
+    <div id="telaMenu" class="tela">
+        <p>Escolha o modo de jogo</p>
+        <button class="botaoGrande" id="btnEscolherPvc">Jogar contra o Computador</button>
+        <button class="botaoGrande" id="btnEscolherPvp">Jogar contra Outro Jogador</button>
+    </div>
+
+    <div id="telaNivel" class="tela escondido">
+        <p>Escolha a dificuldade</p>
+        <button class="botaoGrande" id="btnNivelMedio">Médio</button>
+        <button class="botaoGrande" id="btnNivelDificil">Difícil</button>
+    </div>
+
+    <div id="telaConfig" class="tela escondido">
+        <p id="tituloConfig">Digite seu nome</p>
+        <input type="text" id="nomeJogador1" placeholder="Jogador 1 (X)">
+        <input type="text" id="nomeJogador2" placeholder="Jogador 2 (O)" class="escondido">
+        <br>
+        <button id="botaoComecar">Começar</button>
+    </div>
+
+    <div id="telaJogo" class="tela escondido">
+        <div id="placar">
+            <div class="placar-item">
+                <div id="placarNome1">Jogador 1</div>
+                <div class="placar-valor" id="placarPontos1">0</div>
+            </div>
+            <div class="placar-item">
+                <div>Empates</div>
+                <div class="placar-valor" id="placarEmpate">0</div>
+            </div>
+            <div class="placar-item">
+                <div id="placarNome2">Computador</div>
+                <div class="placar-valor" id="placarPontos2">0</div>
+            </div>
+        </div>
+
+        <div id="tabuleiroWrapper">
+            <div id="tabuleiro"></div>
+            <div id="overlayVitoria" class="escondido">
+                <canvas id="canvasConfete"></canvas>
+                <div id="textoVitoria"></div>
+            </div>
+        </div>
+
+        <div id="mensagem">Sua vez (X)</div>
+
+        <div>
+            <button class="botaoAcao" id="botaoReiniciar">Jogar de novo</button>
+            <button class="botaoAcao" id="botaoVoltarMenu">Voltar ao Menu</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
